@@ -1,11 +1,33 @@
-import express from 'express.js'
+import axios from 'axios'
 import cors from 'cors.js'
-import {  } from 'mongodb'
-import joi from "joi";
+import daysjs from 'daysjs'
+import dotenv from 'dotenv'
+import express from 'express.js'
+import joi from 'joi'
+import { MongoClient } from 'mongodb'
+
+let db
+const mongoClient = new MongoClient('mongodb://localhost:27017')
+
+try {
+  await mongoClient.connect()
+} catch (error) {
+  console.log(error)
+}
+
+db = mongoClient.db('drivencracy')
+
+
+dotenv.config()
 
 const server = express()
 server.use(cors())
 server.use(express.json())
+
+const pollSchema = joi.object({
+	title: joi.string().min(1).required(),
+	expireAt: joi.string()
+})
 
 // polls
 
@@ -22,6 +44,28 @@ Se expireAt for vazio deve ser considerado 30 dias de enquete por padrão.
 Deve retornar a enquete criada em caso de sucesso com status 201.
 */
 
+server.post('/poll', async (req, res) => {
+
+	const valid = pollSchema.validate({
+    title,
+    expireAt
+  })
+	
+	if (valid.error) {
+		return res.send(400)
+	}
+	try {
+    await mongo.collection('polls').insertOne({
+      title,
+    	expireAt
+    })
+
+    return res.send(201)
+  } catch (error) {
+    console.error(error)
+    return res.send(500)
+  }
+})
 
 /*GET
 [
@@ -34,6 +78,15 @@ Deve retornar a enquete criada em caso de sucesso com status 201.
 ]
 
 */
+
+server.get('/poll', async (req, res) => {
+	try {
+		const polls = await db.collection('polls').find().toArray()
+	} catch (err) {
+		console.log(error)
+    return res.send(500)
+	}
+})
 
 //choice
 
@@ -110,5 +163,6 @@ Validação: caso a enquete não exista deve retornar status 404.
 
 */
 
-
-server.listen(5000, () => console.log('Listening on port 5000...'))
+server.listen(process.env.API, () => {
+  console.log(`listen on port ${process.env.API}`)
+})
