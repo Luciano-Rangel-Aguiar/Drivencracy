@@ -1,10 +1,12 @@
-import axios from 'axios'
-import cors from 'cors.js'
-import daysjs from 'daysjs'
+import cors from 'cors'
+import dayjs from 'dayjs'
+import customParseFormat from './node_modules/dayjs/plugin/customParseFormat.js'
 import dotenv from 'dotenv'
-import express from 'express.js'
+import express from 'express'
 import joi from 'joi'
-import { MongoClient } from 'mongodb'
+import { MongoClient, ObjectId } from 'mongodb'
+
+dayjs.extend(customParseFormat)
 
 let db
 const mongoClient = new MongoClient('mongodb://localhost:27017')
@@ -17,47 +19,56 @@ try {
 
 db = mongoClient.db('drivencracy')
 
-
 dotenv.config()
 
 const server = express()
 server.use(cors())
 server.use(express.json())
 
-const pollSchema = joi.object({
-	title: joi.string().min(1).required(),
-	expireAt: joi.string()
+const pollSchema = joi
+  .object({
+    title: joi.string().required(),
+    expireAt: joi.string()
+  })
+  .custom(obj => {
+    const dateValid = dayjs(obj.expireAt, 'YYYY-MM-DD HH:mm', true).isValid()
+    if (!dateValid) {
+      throw new Error(
+        'Date format is invalid, valid format should be "YYYY-MM-DD HH:mm".'
+      )
+    }
+  })
+
+const choiceSchema = joi.object({
+  title: joi.string().required(),
+  pollId: joi.string().required()
 })
 
 // polls
 
-/*POST
-{
-  title: "Qual a sua linguagem favorita?",
-	expireAt: "2022-02-28 01:00" 
-}
-
-Title não pode ser uma string vazia, retornar status 422.
-
-Se expireAt for vazio deve ser considerado 30 dias de enquete por padrão.
-
-Deve retornar a enquete criada em caso de sucesso com status 201.
-*/
-
 server.post('/poll', async (req, res) => {
+  let { title, expireAt } = req.body
 
-	const valid = pollSchema.validate({
+  if (!expireAt) {
+    expireAt = dayjs(Date.now()).add(30, 'day').format('YYYY-MM-DD HH:mm')
+  }
+
+  const valid = pollSchema.validate({
     title,
     expireAt
   })
-	
-	if (valid.error) {
-		return res.send(400)
-	}
-	try {
-    await mongo.collection('polls').insertOne({
+
+  if (valid.error) {
+    if (valid.error.message == `"title" is not allowed to be empty`) {
+      return res.send(422)
+    }
+
+    return res.send(400)
+  }
+  try {
+    await db.collection('polls').insertOne({
       title,
-    	expireAt
+      expireAt
     })
 
     return res.send(201)
@@ -67,47 +78,70 @@ server.post('/poll', async (req, res) => {
   }
 })
 
-/*GET
-[
-	{
-		_id: "54759eb3c090d83494e2d222",
-    title: "Qual a sua linguagem favorita?",
-		expireAt: "2022-02-28 01:00" 
-	},
-	...
-]
-
-*/
-
 server.get('/poll', async (req, res) => {
-	try {
-		const polls = await db.collection('polls').find().toArray()
-	} catch (err) {
-		console.log(error)
+  try {
+    const polls = await db.collection('polls').find({}).toArray()
+
+    return res.send(polls)
+  } catch (error) {
+    console.error(error)
     return res.send(500)
-	}
+  }
+
+  return res.send(200)
 })
 
 //choice
 
-/*POST
-{
-    title: "JavaScript",
-		pollId: "54759eb3c090d83494e2d222",
-}
+server.post('/choice', async (req, res) => {
+  const { title, pollId } = req.body
 
-Validação:
+  const valid = choiceSchema.validate({
+    title,
+    pollId
+  })
 
-Uma opção de voto não pode ser inserida sem uma enquete existente, retornar status 404.
+  if (valid.error) {
+    if (valid.error.message == `"title" is not allowed to be empty`) {
+      return res.send(422)
+    }
 
-Title não pode ser uma string vazia, retornar status 422.
+    return res.send(400)
+  }
+  try {
+    const pollExist = await db
+      .collection('polls')
+      .findOne({ _id: ObjectId(pollId) })
+    console.log()
+    if (
+      dayjs().isAfter(dayjs(pollExist.expireAt).toDate())
+    ) {
+      return res.send(403)
+    }
+  } catch {
+    return res.send(404)
+  }
+  try {
+    const choiceExist = await db.collection('choices').findOne({ title: title })
+    if (choiceExist) {
+      return res.send(409)
+    }
+  } catch {
+    return res.send(500)
+  }
 
-Title não pode ser uma string vazia, retornar status 422.
+  try {
+    await db.collection('choices').insertOne({
+      title,
+      pollId
+    })
 
-Se a enquete já estiver expirado deve retornar erro com status 403.
-
-Deve retornar a opção de voto criada em caso de sucesso com status 201.
-*/
+    return res.send(201)
+  } catch (error) {
+    console.error(error)
+    return res.send(500)
+  }
+})
 
 //poll/:id/choice
 
