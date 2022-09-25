@@ -6,8 +6,9 @@ import express from 'express'
 import joi from 'joi'
 import { MongoClient, ObjectId } from 'mongodb'
 
-dayjs.extend(customParseFormat)
+
 dotenv.config()
+dayjs.extend(customParseFormat)
 
 let db
 const mongoClient = new MongoClient(process.env.MONGO_URI)
