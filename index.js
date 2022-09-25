@@ -73,7 +73,6 @@ server.post('/poll', async (req, res) => {
 
     return res.send(201)
   } catch (error) {
-    console.error(error)
     return res.send(500)
   }
 })
@@ -84,7 +83,6 @@ server.get('/poll', async (req, res) => {
 
     return res.send(polls)
   } catch (error) {
-    console.error(error)
     return res.send(500)
   }
 
@@ -137,7 +135,6 @@ server.post('/choice', async (req, res) => {
 
     return res.send(201)
   } catch (error) {
-    console.error(error)
     return res.send(500)
   }
 })
@@ -160,7 +157,6 @@ server.get('/poll/:id/choice', async (req, res) => {
     pollChoices.map(r => {
       delete r.votes
     })
-    console.log(pollChoices)
     res.send(pollChoices)
   } catch {
     return res.send(500)
