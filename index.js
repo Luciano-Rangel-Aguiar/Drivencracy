@@ -59,7 +59,7 @@ server.post('/poll', async (req, res) => {
   })
 
   if (valid.error) {
-    if (valid.error.message == `"title" is not allowed to be empty`) {
+    if (valid.error.message == '"title" is not allowed to be empty') {
       return res.send(422)
     }
 
@@ -102,7 +102,7 @@ server.post('/choice', async (req, res) => {
   })
 
   if (valid.error) {
-    if (valid.error.message == `"title" is not allowed to be empty`) {
+    if (valid.error.message == '"title" is not allowed to be empty') {
       return res.send(422)
     }
 
@@ -112,10 +112,8 @@ server.post('/choice', async (req, res) => {
     const pollExist = await db
       .collection('polls')
       .findOne({ _id: ObjectId(pollId) })
-    console.log()
-    if (
-      dayjs().isAfter(dayjs(pollExist.expireAt).toDate())
-    ) {
+
+    if (dayjs().isAfter(dayjs(pollExist.expireAt).toDate())) {
       return res.send(403)
     }
   } catch {
@@ -133,7 +131,8 @@ server.post('/choice', async (req, res) => {
   try {
     await db.collection('choices').insertOne({
       title,
-      pollId
+      pollId,
+      votes: 0
     })
 
     return res.send(201)
@@ -145,57 +144,85 @@ server.post('/choice', async (req, res) => {
 
 //poll/:id/choice
 
-/*GET
-[
-	{
-		_id: "54759eb3c090d83494e2d999",
-		title: "Javascript",
-		pollId: "54759eb3c090d83494e2d222" 
-	 },
-	{
-		_id: "54759eb3c090d83494e2d888",
-	  title: "Python",
-		pollId: "54759eb3c090d83494e2d222"
-	},
-	...
-]
+server.get('/poll/:id/choice', async (req, res) => {
+  const pollId = req.params.id
 
-Validação: caso a enquete não exista deve retornar status 404.
-
-*/
+  try {
+    await db.collection('polls').findOne({ _id: ObjectId(pollId) })
+  } catch {
+    return res.send(404)
+  }
+  try {
+    let pollChoices = await db
+      .collection('choices')
+      .find({ pollId: pollId })
+      .toArray()
+    pollChoices.map(r => {
+      delete r.votes
+    })
+    console.log(pollChoices)
+    res.send(pollChoices)
+  } catch {
+    return res.send(500)
+  }
+})
 
 //choice/:id/vote
 
-/*POST
-Não recebe nenhum dado do body da requisição. Deve registrar um voto na opção selecionada.
-
-O voto deve armazenar a data e hora que foi criado no backend. 
-
-Validações:
-
-Verificar se é uma opção existente, se não existir retornar 404.
-
-Não pode ser registrado se a enquete já estiver expirado, retornar erro 403.
-
-Retorna status 201 em caso de sucesso.
-
-*/
+server.post('/choice/:id/vote', async (req, res) => {
+  const choiceId = req.params.id
+  let votedChoice = await db
+    .collection('choices')
+    .findOne({ _id: ObjectId(choiceId) })
+  if (!votedChoice) {
+    return res.send(404)
+  }
+  try {
+    const poll = await db
+      .collection('polls')
+      .findOne({ _id: ObjectId(votedChoice.pollId) })
+    if (dayjs().isAfter(dayjs(poll.expireAt).toDate())) {
+      return res.send(403)
+    }
+  } catch {
+    return res.send(500)
+  }
+  votedChoice.votes++
+  try {
+    await db
+      .collection('choices')
+      .replaceOne({ _id: ObjectId(choiceId) }, votedChoice)
+    console.log(votedChoice)
+    return res.send(200)
+  } catch {
+    return res.send(500)
+  }
+})
 
 //poll/:id/result
 
-/*GET
-{
-	_id: "54759eb3c090d83494e2d222",
-	title: "Qual a sua linguagem de programação favorita?"
-	expireAt: "2022-02-14 01:00",
-	result : {
-	title: "Javascript",
-	votes: 487
-}
+server.get('/poll/:id/result', async (req, res) => {
+  const pollId = req.params.id
 
-Validação: caso a enquete não exista deve retornar status 404.
-
-*/
+  try {
+    let poll = await db.collection('polls').findOne({ _id: ObjectId(pollId) })
+    const winnerChoice = await db
+      .collection('choices')
+      .find({ pollId: pollId })
+      .sort({ votes: -1 })
+      .limit(1)
+      .toArray()
+    const result = {
+      title: winnerChoice[0].title,
+      votes: winnerChoice[0].votes
+    }
+    Object.assign(poll, { result: result })
+    console.log(result)
+    return res.send(poll)
+  } catch {
+    return res.send(404)
+  }
+})
 
 server.listen(process.env.API, () => {
   console.log(`listen on port ${process.env.API}`)
