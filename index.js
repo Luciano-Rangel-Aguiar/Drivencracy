@@ -7,9 +7,10 @@ import joi from 'joi'
 import { MongoClient, ObjectId } from 'mongodb'
 
 dayjs.extend(customParseFormat)
+dotenv.config()
 
 let db
-const mongoClient = new MongoClient('mongodb://localhost:27017')
+const mongoClient = new MongoClient(process.env.MONGO_URI)
 
 try {
   await mongoClient.connect()
@@ -18,8 +19,6 @@ try {
 }
 
 db = mongoClient.db('drivencracy')
-
-dotenv.config()
 
 const server = express()
 server.use(cors())
