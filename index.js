@@ -224,6 +224,6 @@ server.get('/poll/:id/result', async (req, res) => {
   }
 })
 
-server.listen(process.env.API, () => {
-  console.log(`listen on port ${process.env.API}`)
+server.listen(process.env.PORT, () => {
+  console.log(`listen on port ${process.env.PORT}`)
 })

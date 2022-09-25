@@ -1,4 +1,9 @@
 {"type": "module",
+"scripts": {
+    "start": "node ./index.js",
+		"dev": "npx nodemon ./index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+},
   "dependencies": {
     "axios": "^0.27.2",
     "cors": "^2.8.5",
